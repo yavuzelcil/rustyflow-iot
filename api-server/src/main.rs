@@ -1,29 +1,57 @@
 mod routes;
+mod config;
+mod state;
 
-use axum::{Router, routing::get};
+use axum::{Router, routing::{get, post, put, delete}};
 use tracing_subscriber;
+use config::Config;
+use state::AppState;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().ok();
+    // Config yükle
+    let cfg = Config::load();
+
+    // logging
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(cfg.log_level.clone())
         .init();
 
-    // Basit config: PORT env var, yoksa 3000
-    let port: u16 = std::env::var("APP_PORT")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(3000);
+    // Boş in-memory store
+    let store = Arc::new(RwLock::new(HashMap::new()));
+    let app_state = AppState { cfg: cfg.clone(), media_store: store };
 
+    // Router
     let app = Router::new()
-        .route("/health", get(routes::health::health))
-        .route("/ready",  get(routes::health::ready))
-        .route("/",       get(routes::health::root));
+        // sistem/health
+        .route("/",           get(routes::health::root))
+        .route("/health",     get(routes::health::health))
+        .route("/ready",      get(routes::health::ready))
+        .route("/v1/config",  get(routes::sys::config))
+        // media CRUD (in-memory)
+        .route("/v1/media",           post(routes::media::create_media).get(routes::media::list_media))
+        .route("/v1/media/{id}",       get(routes::media::get_media))
+        .route("/v1/media/{id}",       put(routes::media::update_media))
+        .route("/v1/media/{id}",       delete(routes::media::delete_media))
+        // AppState'i tüm handler'lara ver
+        .with_state(app_state);
 
-    let addr = std::net::SocketAddr::from(([0,0,0,0], port));
+    // Portu config'ten al
+    let addr = std::net::SocketAddr::from(([0,0,0,0], cfg.app_port));
     tracing::info!("api-server listening on http://{addr}");
-    axum::serve(tokio::net::TcpListener::bind(addr).await.unwrap(), app)
-        .await
-        .unwrap();
+
+    axum::serve(
+        tokio::net::TcpListener::bind(addr).await.unwrap(),
+        app
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .unwrap();
+}
+
+async fn shutdown_signal() {
+    let _ = tokio::signal::ctrl_c().await;
+    tracing::info!("shutdown signal received, exiting...");
 }

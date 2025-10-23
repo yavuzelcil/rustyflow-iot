@@ -5,9 +5,11 @@ edition = "2021"
 
 [dependencies]
 axum = "0.8"
-tokio = { version = "1", features = ["full"] }
+dotenvy = "0.15"
+envy = "0.4"
 serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tokio = { version = "1", features = ["full"] }   # zaten vardı
 serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-dotenvy = "0.15"
