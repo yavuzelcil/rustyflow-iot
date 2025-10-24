@@ -21,7 +21,29 @@ async fn main() {
 
     // Boş in-memory store
     let store = Arc::new(RwLock::new(HashMap::new()));
-    let app_state = AppState { cfg: cfg.clone(), media_store: store };
+
+    let db_pool = if let Some(url) = cfg.database_url.clone() {
+        match sqlx::postgres::PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(2))
+            .connect(&url)
+            .await
+        {
+            Ok(pool) => {
+                tracing::info!("DB connected");
+                Some(pool)
+            }
+            Err(e) => {
+                tracing::warn!("DB connection failed: {e}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+
+    let app_state = AppState { cfg: cfg.clone(), media_store: store, db: db_pool };
 
     // Router
     let app = Router::new()
@@ -36,6 +58,7 @@ async fn main() {
         .route("/v1/media/{id}",       put(routes::media::update_media))
         .route("/v1/media/{id}",       delete(routes::media::delete_media))
         // AppState'i tüm handler'lara ver
+        .route("/db/health", get(|| async { "ok" }))
         .with_state(app_state);
 
     // Portu config'ten al
