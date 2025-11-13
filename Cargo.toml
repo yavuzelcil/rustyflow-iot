@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "api-server",
+    "api-server", "shared-types",
 ]
 resolver = "2"
