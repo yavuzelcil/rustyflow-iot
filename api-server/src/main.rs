@@ -8,6 +8,7 @@ use config::Config;
 use state::AppState;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
+use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
 async fn main() {
@@ -23,7 +24,7 @@ async fn main() {
     let store = Arc::new(RwLock::new(HashMap::new()));
 
     let db_pool = if let Some(url) = cfg.database_url.clone() {
-        match sqlx::postgres::PgPoolOptions::new()
+        match PgPoolOptions::new()
             .max_connections(5)
             .acquire_timeout(std::time::Duration::from_secs(2))
             .connect(&url)
