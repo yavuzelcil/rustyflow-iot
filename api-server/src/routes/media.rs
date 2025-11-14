@@ -4,9 +4,9 @@
 //! PostgreSQL'e veya in-memory store'a kayıt yapılır (fallback).
 //!
 //! # Yapı
-//! - Media: Yayınlanan media nesnesinin yapısı
-//! - NewMedia: Yeni media oluştururken gönderilen veri
-//! - UpdateMedia: Media güncellerken gönderilen veri (partial update)
+//! - Media: shared-types'tan import edilen media nesnesi
+//! - NewMedia: shared-types'tan import edilen yeni media request
+//! - UpdateMedia: shared-types'tan import edilen güncelleme request
 //!
 //! # Endpoint'ler
 //! - POST /v1/media - Yeni media oluştur
@@ -16,85 +16,13 @@
 //! - DELETE /v1/media/{id} - Medyayı sil
 
 use axum::{extract::{Path, State}, http::StatusCode, Json};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use sqlx::FromRow;
 
 use crate::state::AppState;
 
-// ============================================================================
-// VERİ TİPLERİ (DATA STRUCTURES)
-// ============================================================================
-
-/// Medya nesnesi - Veritabanında depolanan gösterim
-/// 
-/// # Alanlar
-/// - `id`: Benzersiz UUID tanımlayıcı (UUID v4)
-/// - `name`: Medya dosyasının adı (örn: "profile.jpg")
-/// - `path`: Dosya sistemi veya S3 yolu (örn: "/uploads/2024/profile.jpg")
-/// 
-/// # Serializasyon
-/// - `Serialize`: JSON response'ları için
-/// - `FromRow`: SQLx ile database satırlarından otomatik dönüştürme
-/// - `Clone`: Request arasında verileri kopyalamak için
-/// 
-/// # Örnek
-/// ```json
-/// {
-///   "id": "550e8400-e29b-41d4-a716-446655440000",
-///   "name": "avatar.png",
-///   "path": "/uploads/users/123/avatar.png"
-/// }
-/// ```
-#[derive(Serialize, Clone, FromRow)]
-pub struct Media {
-    pub id: Uuid,
-    pub name: String,
-    pub path: String,
-}
-
-/// Yeni medya oluştururken gönderilen request body
-/// 
-/// Client POST /v1/media'ya bu yapıyı JSON olarak gönderir.
-/// 
-/// # Örnek
-/// ```json
-/// {
-///   "name": "vacation.jpg",
-///   "path": "/uploads/photos/2024/vacation.jpg"
-/// }
-/// ```
-#[derive(Deserialize)]
-pub struct NewMedia {
-    pub name: String,
-    pub path: String,
-}
-
-/// Medya güncellerken gönderilen request body (partial update)
-/// 
-/// Client PUT /v1/media/{id}'ye bu yapıyı JSON olarak gönderir.
-/// Sadece değiştirmek istenen alanları göndermek yeterli.
-/// 
-/// # Örnek 1: Sadece adı güncelle
-/// ```json
-/// {
-///   "name": "new-name.jpg",
-///   "path": null
-/// }
-/// ```
-/// 
-/// # Örnek 2: Sadece yolu güncelle
-/// ```json
-/// {
-///   "name": null,
-///   "path": "/uploads/photos/new/location.jpg"
-/// }
-/// ```
-#[derive(Deserialize)]
-pub struct UpdateMedia {
-    pub name: Option<String>,
-    pub path: Option<String>,
-}
+// shared-types'tan Media tiplerini import et
+// Artık kendi Media struct'ımız yok, merkezi shared-types'ı kullanıyoruz
+use shared_types::{Media, NewMedia, UpdateMedia};
 
 // ============================================================================
 // HTTP HANDLER FONKSİYONLARI (HTTP HANDLERS)
@@ -131,17 +59,18 @@ pub async fn create_media(
     State(st): State<AppState>,
     Json(body): Json<NewMedia>,
 ) -> Result<(StatusCode, Json<Media>), StatusCode> {
-    let id = Uuid::new_v4();
-    
     if let Some(db) = &st.db {
         // ===== PostgreSQL Yolu =====
-        // SQL: INSERT INTO media_datas (id, name, path) VALUES (...) RETURNING *
         let item = sqlx::query_as::<_, Media>(
-            "INSERT INTO media_datas (id, name, path) VALUES ($1, $2, $3) RETURNING id, name, path"
+            "INSERT INTO media_datas (id, name, path, mime_type, size_bytes, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) 
+             RETURNING id, name, path, mime_type, size_bytes, created_at, updated_at"
         )
-        .bind(id)
+        .bind(Uuid::new_v4())
         .bind(&body.name)
         .bind(&body.path)
+        .bind(&body.mime_type)
+        .bind(body.size_bytes)
         .fetch_one(db)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -149,11 +78,7 @@ pub async fn create_media(
         Ok((StatusCode::CREATED, Json(item)))
     } else {
         // ===== In-Memory Fallback =====
-        let item = Media {
-            id,
-            name: body.name,
-            path: body.path,
-        };
+        let item = Media::new(body.name, body.path, body.mime_type, body.size_bytes);
         let mut map = st.media_store.write().await;
         map.insert(item.id, item.clone());
         Ok((StatusCode::CREATED, Json(item)))
@@ -187,7 +112,9 @@ pub async fn create_media(
 pub async fn list_media(State(st): State<AppState>) -> Result<Json<Vec<Media>>, StatusCode> {
     if let Some(db) = &st.db {
         // ===== PostgreSQL Yolu =====
-        let items = sqlx::query_as::<_, Media>("SELECT id, name, path FROM media_datas")
+        let items = sqlx::query_as::<_, Media>(
+            "SELECT id, name, path, mime_type, size_bytes, created_at, updated_at FROM media_datas"
+        )
             .fetch_all(db)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -229,7 +156,7 @@ pub async fn get_media(
     if let Some(db) = &st.db {
         // ===== PostgreSQL Yolu =====
         let item = sqlx::query_as::<_, Media>(
-            "SELECT id, name, path FROM media_datas WHERE id = $1"
+            "SELECT id, name, path, mime_type, size_bytes, created_at, updated_at FROM media_datas WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(db)  // Sonuç: Option<Media>
@@ -284,8 +211,8 @@ pub async fn update_media(
         // ===== PostgreSQL Yolu =====
         
         // Step 1: Mevcut kaydı al
-        let current = sqlx::query_as::<_, Media>(
-            "SELECT id, name, path FROM media_datas WHERE id = $1"
+        let mut current = sqlx::query_as::<_, Media>(
+            "SELECT id, name, path, mime_type, size_bytes, created_at, updated_at FROM media_datas WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(db)
@@ -293,16 +220,19 @@ pub async fn update_media(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
         
-        // Step 2: Patch değerlerini veya eski değerleri kullan
-        let new_name = patch.name.unwrap_or(current.name);
-        let new_path = patch.path.unwrap_or(current.path);
+        // Step 2: Patch'i uygula
+        current.apply_update(&patch);
         
         // Step 3: Database'i güncelle
         let updated = sqlx::query_as::<_, Media>(
-            "UPDATE media_datas SET name = $1, path = $2 WHERE id = $3 RETURNING id, name, path"
+            "UPDATE media_datas SET name = $1, path = $2, mime_type = $3, size_bytes = $4, updated_at = NOW() 
+             WHERE id = $5 
+             RETURNING id, name, path, mime_type, size_bytes, created_at, updated_at"
         )
-        .bind(&new_name)
-        .bind(&new_path)
+        .bind(&current.name)
+        .bind(&current.path)
+        .bind(&current.mime_type)
+        .bind(current.size_bytes)
         .bind(id)
         .fetch_one(db)
         .await
@@ -313,11 +243,7 @@ pub async fn update_media(
         // ===== In-Memory Fallback =====
         let mut map = st.media_store.write().await;
         let item = map.get_mut(&id).ok_or(StatusCode::NOT_FOUND)?;
-        
-        // Patch uygula (Option::unwrap_or mantığı)
-        if let Some(name) = patch.name { item.name = name; }
-        if let Some(path) = patch.path { item.path = path; }
-        
+        item.apply_update(&patch);
         Ok(Json(item.clone()))
     }
 }   

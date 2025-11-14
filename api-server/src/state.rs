@@ -7,6 +7,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 use sqlx::PgPool;
+use shared_types::Media;
 
 use crate::config::Config;
 
@@ -51,7 +52,7 @@ pub struct AppState {
     ///   - Çoklu eş zamanlı okumaları destekler
     ///   - Yazma için exclusive lock alır
     /// - `HashMap<Uuid, Media>` = ID -> Media eşlemesi
-    pub media_store: Arc<RwLock<HashMap<Uuid, super::routes::media::Media>>>,
+    pub media_store: Arc<RwLock<HashMap<Uuid, Media>>>,
 
     /// PostgreSQL connection pool
     /// 
