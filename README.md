@@ -130,12 +130,28 @@ This project is inspired by and builds upon concepts from:
 
 ## 🗺️ Roadmap
 
+### ✅ Completed
 - [x] Project structure and basic setup
-- [ ] Core shared types and error handling
+- [x] Core shared types and error handling
+  - Media, Sensor, Error types with comprehensive documentation
+  - MQTT message structures (MqttMessage, DeviceMessage, DeviceCommand)
+  - Common Result type and error conversions
+- [x] API server with REST endpoints
+  - Axum-based REST API with health checks
+  - Media CRUD operations (POST, GET, PUT, DELETE)
+  - System configuration endpoints
+  - Comprehensive doc comments ("mala anlatır gibi")
+- [x] PostgreSQL integration
+  - Docker Compose setup with PostgreSQL 16
+  - SQLx migrations with UUID support
+  - Connection pooling and fallback to in-memory storage
+  - Full 7-field Media schema with timestamps
+
+### 🚧 In Progress
 - [ ] MQTT gateway with basic pub/sub
-- [ ] API server with REST endpoints
 - [ ] Edge agent with mock sensors
-- [ ] PostgreSQL integration
+
+### 📋 Planned
 - [ ] Machine learning model integration
 - [ ] Camera and OpenCV integration
 - [ ] Real-time dashboard
