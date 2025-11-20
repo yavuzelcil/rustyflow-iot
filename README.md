@@ -146,10 +146,21 @@ This project is inspired by and builds upon concepts from:
   - SQLx migrations with UUID support
   - Connection pooling and fallback to in-memory storage
   - Full 7-field Media schema with timestamps
+- [x] MQTT gateway with basic pub/sub
+  - rumqttc async MQTT client
+  - Multi-topic subscription with wildcard support (sensors/#, devices/#)
+  - Message parsing with shared-types::MqttMessage
+  - Auto-reconnect with backoff
+  - Mosquitto broker in Docker
+- [x] Edge agent with mock sensors
+  - Mock sensors: temperature, humidity, motion (PIR)
+  - Realistic data generation with gradual value changes
+  - Periodic MQTT publishing (configurable interval)
+  - Ready for real sensor integration (rppal/embedded-hal)
+  - Tested end-to-end with gateway
 
 ### 🚧 In Progress
-- [ ] MQTT gateway with basic pub/sub
-- [ ] Edge agent with mock sensors
+- None currently!
 
 ### 📋 Planned
 - [ ] Machine learning model integration
