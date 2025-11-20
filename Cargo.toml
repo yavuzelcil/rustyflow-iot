@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "api-server", "mqtt-gateway", "shared-types",
+    "api-server", "edge-agent", "mqtt-gateway", "shared-types",
 ]
 resolver = "2"
