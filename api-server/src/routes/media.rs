@@ -1,5 +1,7 @@
 //! Media CRUD Endpoint'leri
-//!
+//! 
+//! CRUD: Create, Read, Update, Delete
+//! 
 //! Fotoğraf, video ve diğer media dosyalarının yönetimi için REST endpoint'leri.
 //! PostgreSQL'e veya in-memory store'a kayıt yapılır (fallback).
 //!
