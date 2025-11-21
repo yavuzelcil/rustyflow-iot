@@ -13,6 +13,7 @@ use tokio::time::Duration;
 use tracing::{info, warn, error, debug};
 use config::Config;
 use shared_types::messages::MqttMessage;
+use reqwest::Client as HttpClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -59,7 +60,15 @@ async fn main() -> anyhow::Result<()> {
 
     info!("✅ Gateway ready, listening for messages...");
 
-    // ========== 5. EVENT LOOP - MESAJLARI DİNLE ==========
+    // ========== 5. HTTP CLIENT ==========
+    // API server'a veri göndermek için HTTP client oluştur
+    let http_client = HttpClient::new();
+    let api_url = std::env::var("API_SERVER_URL")
+        .unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let sensor_endpoint = format!("{}/api/sensors", api_url);
+    info!("🌐 API server: {}", sensor_endpoint);
+
+    // ========== 6. EVENT LOOP - MESAJLARI DİNLE ==========
     // MQTT broker'dan gelen tüm event'leri işle
     loop {
         match eventloop.poll().await {
@@ -68,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
                 
                 // Sadece gelen mesajları işle (Publish event'leri)
                 if let Event::Incoming(Packet::Publish(publish)) = notification {
-                    handle_message(&publish.topic, &publish.payload).await;
+                    handle_message(&publish.topic, &publish.payload, &http_client, &sensor_endpoint).await;
                 }
             }
             Err(e) => {
@@ -80,18 +89,32 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Gelen MQTT mesajını işle
+/// Sensör verisi - API server'a gönderilecek format
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct SensorData {
+    device_id: String,
+    sensor_type: String,
+    value: f64,
+    unit: String,
+    timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<serde_json::Value>,
+}
+
+/// Gelen MQTT mesajını işle ve API server'a forward et
 /// 
 /// # Parametreler
-/// - `topic`: Mesajın geldiği MQTT topic (örn: "sensors/temperature")
+/// - `topic`: Mesajın geldiği MQTT topic (örn: "sensors/edge-agent/temperature")
 /// - `payload`: Mesaj içeriği (byte array)
+/// - `http_client`: API server'a request göndermek için HTTP client
+/// - `sensor_endpoint`: API server'ın sensor endpoint'i
 /// 
 /// # İşlem Adımları
 /// 1. Payload'u String'e dönüştür
 /// 2. JSON parse et (shared-types::MqttMessage formatında)
-/// 3. Mesaj tipine göre işle
-/// 4. İleride: API server'a forward et
-async fn handle_message(topic: &str, payload: &[u8]) {
+/// 3. SensorReading'i SensorData'ya çevir
+/// 4. API server'a POST et
+async fn handle_message(topic: &str, payload: &[u8], http_client: &HttpClient, sensor_endpoint: &str) {
     // Payload'u String'e çevir
     let payload_str = match std::str::from_utf8(payload) {
         Ok(s) => s,
@@ -109,9 +132,54 @@ async fn handle_message(topic: &str, payload: &[u8]) {
             info!("✅ Parsed message:");
             info!("   Device ID: {}", msg.device_id);
             info!("   Message type: {:?}", msg.message_type);
-            info!("   QoS: {:?}", msg.qos);
             
-            // İleride buraya API server'a forward veya database write eklenebilir
+            // SensorReading'i payload'dan parse et
+            if let Ok(reading) = serde_json::from_value::<shared_types::sensor::SensorReading>(msg.payload.clone()) {
+                // Sensör tipini topic'ten al
+                let sensor_type = topic.split('/').last().unwrap_or("unknown").to_string();
+                
+                // String değeri f64'e çevir
+                let value = reading.value.parse::<f64>().unwrap_or(0.0);
+                
+                // Unit'i sensör tipine göre belirle
+                let unit = match sensor_type.as_str() {
+                    "temperature" => "°C".to_string(),
+                    "humidity" => "%".to_string(),
+                    "motion" => "bool".to_string(),
+                    _ => "".to_string(),
+                };
+                
+                let sensor_data = SensorData {
+                    device_id: msg.device_id.to_string(),
+                    sensor_type,
+                    value,
+                    unit,
+                    timestamp: reading.timestamp.to_rfc3339(),
+                    metadata: reading.metadata.clone(),
+                };
+
+                debug!("📦 Sensor data to forward: {:?}", sensor_data);
+
+                // API server'a POST request
+                match http_client.post(sensor_endpoint)
+                    .json(&sensor_data)
+                    .send()
+                    .await
+                {
+                    Ok(response) => {
+                        if response.status().is_success() {
+                            info!("✅ Forwarded to API server: {}", sensor_data.sensor_type);
+                        } else {
+                            warn!("⚠️  API server returned error: {}", response.status());
+                        }
+                    }
+                    Err(e) => {
+                        error!("❌ Failed to forward to API server: {}", e);
+                    }
+                }
+            } else {
+                debug!("ℹ️  Payload is not a SensorReading");
+            }
         }
         Err(e) => {
             // JSON parse başarısız (farklı format olabilir, sorun değil)

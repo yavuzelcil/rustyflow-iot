@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+#[cfg(feature = "sqlx-support")]
 use sqlx::FromRow;
 use chrono::{DateTime, Utc};
 
@@ -41,7 +42,8 @@ use chrono::{DateTime, Utc};
 ///   "updated_at": "2024-11-13T21:30:00Z"
 /// }
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "sqlx-support", derive(FromRow))]
 pub struct Media {
     pub id: Uuid,
     pub name: String,

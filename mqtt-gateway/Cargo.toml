@@ -28,3 +28,6 @@ thiserror = "1.0"
 
 # JSON serialization
 serde_json = "1.0"
+
+# HTTP client for API server
+reqwest = { version = "0.12", features = ["json"] }

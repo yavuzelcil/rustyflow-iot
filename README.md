@@ -159,15 +159,144 @@ This project is inspired by and builds upon concepts from:
   - Ready for real sensor integration (rppal/embedded-hal)
   - Tested end-to-end with gateway
 
-### 🚧 In Progress
-- None currently!
+### ✅ Recently Completed
+- [x] **Web Dashboard with Leptos + WASM**
+  - Real-time sensor monitoring interface
+  - Auto-refresh every 2 seconds
+  - Responsive design with CSS animations
+  - Temperature, humidity, motion sensor cards
+  - Full Rust stack (backend + frontend)
+- [x] **API Sensor Endpoints**
+  - GET/POST /api/sensors for real-time data
+  - In-memory cache for sensor readings
+  - CORS support for web dashboard
+- [x] **MQTT Gateway → API Integration**
+  - Forward sensor data from MQTT to REST API
+  - HTTP client with reqwest
+  - Automatic sensor type and unit detection
+  - Complete data flow: Edge → MQTT → Gateway → API → Dashboard
 
-### 📋 Planned
+### 🚧 In Progress
+- [ ] Production hardening (see roadmap below)
+
+### 📋 Short-term Goals
+- [ ] Deploy to Raspberry Pi 5 (8GB RAM)
+- [ ] Real sensor integration (DHT22, PIR, camera)
+- [ ] Persistent sensor data storage
+- [ ] Redis integration for distributed caching
+
+### 🎯 Long-term Vision
 - [ ] Machine learning model integration
-- [ ] Camera and OpenCV integration
-- [ ] Real-time dashboard
+- [ ] Advanced camera features with OpenCV
 - [ ] Kubernetes deployment
+- [ ] Multi-tenant support
 - [ ] CI/CD pipeline
+
+## 🏭 Production Readiness Roadmap
+
+### ⚠️ Current Status: Development/Prototype
+This project is **not production-ready** yet. Below are the gaps that need to be addressed:
+
+#### 🔐 Security
+- [ ] **Authentication & Authorization**
+  - JWT token-based authentication
+  - Role-based access control (RBAC)
+  - API key management for IoT devices
+- [ ] **TLS/HTTPS**
+  - SSL certificates for all services
+  - Encrypted MQTT connections (MQTTS)
+  - Secure WebSocket connections
+- [ ] **Input Validation**
+  - Rate limiting per IP/user
+  - Request size limits
+  - SQL injection prevention (already using SQLx with compile-time checks)
+
+#### 📊 Observability
+- [ ] **Monitoring & Metrics**
+  - Prometheus metrics export
+  - Grafana dashboards
+  - Custom business metrics (sensor readings/min, API latency, etc.)
+- [ ] **Logging**
+  - Structured logging (JSON format)
+  - Centralized log aggregation (ELK/Loki)
+  - Log rotation and retention policies
+- [ ] **Alerting**
+  - Alert manager integration
+  - Slack/PagerDuty notifications
+  - Anomaly detection alerts
+
+#### 💾 Data Persistence
+- [ ] **Sensor Data Storage**
+  - Time-series database (TimescaleDB/InfluxDB)
+  - Historical data retention policies
+  - Data archival strategy
+- [ ] **Caching Layer**
+  - Redis for distributed caching
+  - Cache invalidation strategies
+  - TTL policies for sensor data
+- [ ] **Backups**
+  - Automated database backups
+  - Point-in-time recovery
+  - Disaster recovery plan
+
+#### 🚀 Scalability
+- [ ] **Horizontal Scaling**
+  - Load balancer (nginx/traefik)
+  - Multiple API server instances
+  - Session management for stateless APIs
+- [ ] **Message Queue**
+  - Kafka/RabbitMQ for event streaming
+  - Dead letter queues for failed messages
+  - Message replay capability
+- [ ] **Database Optimization**
+  - Connection pooling tuning
+  - Database indexing strategy
+  - Read replicas for scaling reads
+
+#### 🛠️ Reliability
+- [ ] **Error Handling**
+  - Graceful degradation
+  - Circuit breakers for external services
+  - Retry mechanisms with exponential backoff
+- [ ] **Health Checks**
+  - Kubernetes liveness/readiness probes
+  - Deep health checks (database, MQTT, cache)
+  - Service mesh integration
+- [ ] **Testing**
+  - Integration tests for all services
+  - Load testing (locust/k6)
+  - Chaos engineering experiments
+
+#### 📝 Documentation
+- [ ] **API Documentation**
+  - OpenAPI/Swagger specs
+  - Interactive API explorer
+  - Code examples for common use cases
+- [ ] **Deployment Guide**
+  - Step-by-step deployment instructions
+  - Environment configuration guide
+  - Troubleshooting documentation
+- [ ] **Architecture Decision Records (ADRs)**
+  - Document key technical decisions
+  - Trade-offs and alternatives considered
+
+#### 🔄 DevOps
+- [ ] **CI/CD Pipeline**
+  - Automated testing on PR
+  - Docker image building and scanning
+  - Automated deployment to staging/production
+- [ ] **Infrastructure as Code**
+  - Terraform/Pulumi for cloud resources
+  - GitOps workflow (ArgoCD/Flux)
+  - Environment parity (dev/staging/prod)
+
+### 📈 Current Development Focus
+1. **Raspberry Pi Deployment**: Test full stack on real hardware
+2. **Real Sensor Integration**: Replace mock sensors with actual hardware
+3. **Redis Cache**: Implement distributed caching for sensor data
+4. **Time-series DB**: Add TimescaleDB for historical sensor data
+
+---
 
 ## 🤝 Contributing
 

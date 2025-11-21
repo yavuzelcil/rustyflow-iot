@@ -6,7 +6,11 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-uuid = { version = "1.11", features = ["v4", "serde"] }
-sqlx = { version = "0.8", features = ["postgres", "uuid"] }
+uuid = { version = "1.11", features = ["v4", "serde", "js"] }
+sqlx = { version = "0.8", features = ["postgres", "uuid"], optional = true }
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+default = ["sqlx-support"]
+sqlx-support = ["sqlx"]

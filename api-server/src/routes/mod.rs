@@ -6,4 +6,5 @@
 pub mod health;   // Sağlık kontrol endpoint'leri (/, /health, /ready)
 pub mod sys;      // Sistem endpoint'leri (/v1/config)
 pub mod media;    // Media CRUD endpoint'leri (/v1/media/*)
-pub mod db;       // Database endpoint'leri (/db/*) 
+pub mod db;       // Database endpoint'leri (/db/*)
+pub mod sensors;  // Sensör endpoint'leri (/api/sensors) 
