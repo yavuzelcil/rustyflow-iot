@@ -17,6 +17,7 @@ use state::AppState;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use sqlx::postgres::PgPoolOptions;
+use redis::Client as RedisClient;
 use routes::sensors::SensorCache;
 use tower_http::cors::{CorsLayer, Any};
 
@@ -67,14 +68,43 @@ async fn main() {
         None
     };
 
-    // ========== 5. APPLICATION STATE ==========
+    // ========== 5. REDIS BAĞLANTISI ==========
+    // Redis connection manager'ı oluştur
+    // Sensor cache için kullanılacak (in-memory HashMap yerine)
+    // ConnectionManager otomatik reconnect ve connection pooling yapar
+    let redis_conn = match RedisClient::open(cfg.redis_url.clone()) {
+        Ok(client) => {
+            match client.get_connection_manager().await {
+                Ok(manager) => {
+                    tracing::info!("Redis connected: {}", cfg.redis_url);
+                    Some(manager)
+                }
+                Err(e) => {
+                    tracing::warn!("Redis connection manager failed: {e}");
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Redis client creation failed: {e}");
+            None
+        }
+    };
+
+    // ========== 6. APPLICATION STATE ==========
     // Tüm handler'lara pass edilecek shared state
     // - cfg: konfigürasyon
     // - media_store: in-memory fallback
     // - db: PostgreSQL pool (optional)
-    let app_state = AppState { cfg: cfg.clone(), media_store: store, db: db_pool };
+    // - redis: Redis connection manager (optional)
+    let app_state = AppState { 
+        cfg: cfg.clone(), 
+        media_store: store, 
+        db: db_pool,
+        redis: redis_conn,
+    };
 
-    // ========== 6. HTTP ROUTER ==========
+    // ========== 7. HTTP ROUTER ==========
     // CORS layer ekle (web dashboard için)
     let cors = tower_http::cors::CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
@@ -103,12 +133,12 @@ async fn main() {
         // CORS layer'ı ekle
         .layer(cors);
 
-    // ========== 7. SERVER BAŞLAT ==========
+    // ========== 8. SERVER BAŞLAT ==========
     // Sunucu adresi: 0.0.0.0:3000 (tüm interfaces'den dinle)
     let addr = std::net::SocketAddr::from(([0,0,0,0], cfg.app_port));
     tracing::info!("api-server listening on http://{addr}");
 
-    // ========== 8. GRACEFUL SHUTDOWN ==========
+    // ========== 9. GRACEFUL SHUTDOWN ==========
     // Graceful shutdown ile sunucuyu başlat
     // CTRL+C sinyali gelince nazikçe kapat
     axum::serve(
