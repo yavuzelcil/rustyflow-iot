@@ -17,3 +17,4 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chro
 chrono = { version = "0.4", features = ["serde"] }
 shared-types = { path = "../shared-types" }
 tower-http = { version = "0.6", features = ["cors"] }
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
