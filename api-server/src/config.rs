@@ -37,6 +37,16 @@ pub struct Config {
     /// Eğer ayarlanmazsa, API in-memory fallback store kullanır.
     pub database_url: Option<String>,
 
+    /// Redis bağlantı URL'i
+    /// 
+    /// Format: `redis://[user[:password]@][host][:port][/db]`
+    /// 
+    /// Örnek: `REDIS_URL=redis://localhost:6379`
+    /// 
+    /// Eğer ayarlanmazsa, sensor cache için in-memory HashMap kullanılır.
+    #[serde(default = "default_redis_url")]
+    pub redis_url: String,
+
     /// Logging seviyesi (tracing-subscriber için)
     /// 
     /// Geçerli değerler: error, warn, info, debug, trace
@@ -53,6 +63,9 @@ fn default_port() -> u16 { 3000 }
 
 /// Log seviyesinin varsayılan değeri
 fn default_log() -> String { "info".into() }
+
+/// Redis URL'in varsayılan değeri
+fn default_redis_url() -> String { "redis://localhost:6379".into() }
 
 impl Config {
     /// .env dosyasından ve ortam değişkenlerinden yapılandırmayı yükle
@@ -76,6 +89,7 @@ impl Config {
         let mut cfg: Config = envy::from_env().unwrap_or_else(|_| Config {
             app_port: default_port(),
             database_url: None,
+            redis_url: default_redis_url(),
             log_level: default_log(),
         });
 
@@ -105,6 +119,7 @@ impl Config {
         SanitizedConfig {
             app_port: self.app_port,
             has_database_url: self.database_url.is_some(),  // Sadece var/yok bilgisi
+            redis_url: self.redis_url.clone(),  // Redis URL hassas değil (local dev)
             log_level: self.log_level.clone(),
         }
     }
@@ -120,6 +135,8 @@ pub struct SanitizedConfig {
     pub app_port: u16,
     /// Veritabanı bağlantısının konfigüre edilip edilmediği
     pub has_database_url: bool,
+    /// Redis bağlantı URL'i
+    pub redis_url: String,
     /// Log seviyesi
     pub log_level: String,
 }
