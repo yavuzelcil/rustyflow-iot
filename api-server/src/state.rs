@@ -7,6 +7,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 use sqlx::PgPool;
+use redis::aio::ConnectionManager;
 use shared_types::Media;
 
 use crate::config::Config;
@@ -63,4 +64,17 @@ pub struct AppState {
     /// - Timeout'ları yönetir
     /// - Health check'ler yapar
     pub db: Option<PgPool>,
+
+    /// Redis connection manager
+    /// 
+    /// Sensor cache için kullanılır (in-memory HashMap yerine).
+    /// 
+    /// `Option<ConnectionManager>` çünkü Redis bağlanması başarısız olabilir.
+    /// 
+    /// ConnectionManager otomatik olarak:
+    /// - Connection'ı reuse eder (performans)
+    /// - Kopan bağlantıyı yeniden kurar (auto-reconnect)
+    /// - Timeout'ları yönetir
+    /// - Async-compatible (tokio ile çalışır)
+    pub redis: Option<ConnectionManager>,
 }
