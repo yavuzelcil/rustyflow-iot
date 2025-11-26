@@ -18,8 +18,6 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use sqlx::postgres::PgPoolOptions;
 use redis::Client as RedisClient;
-use routes::sensors::SensorCache;
-use tower_http::cors::{CorsLayer, Any};
 
 /// Tokio async runtime ile ana uygulama giriş noktası
 #[tokio::main]
@@ -40,9 +38,6 @@ async fn main() {
     // Media verilerini geçici olarak saklamak için (fallback amaçlı)
     // Arc<RwLock<>> = thread-safe, async-compatible shared state
     let store = Arc::new(RwLock::new(HashMap::new()));
-    
-    // Sensör verilerini cache'lemek için (MQTT gateway'den gelecek)
-    let sensor_cache: SensorCache = Arc::new(RwLock::new(HashMap::new()));
 
     // ========== 4. DATABASE BAĞLANTISI ==========
     // PostgreSQL connection pool'u oluştur
@@ -123,13 +118,12 @@ async fn main() {
         .route("/v1/media/{id}",    get(routes::media::get_media))
         .route("/v1/media/{id}",    put(routes::media::update_media))
         .route("/v1/media/{id}",    delete(routes::media::delete_media))
+        // Sensör endpoint'leri (Redis kullanır)
+        .route("/api/sensors", get(routes::sensors::list_sensors).post(routes::sensors::add_sensor_data))
         // Database sağlık kontrol
         .route("/db/health", get(|| async { "ok" }))
-        // Shared state'i tüm handler'lara inject et
+        // Shared state'i TÜM handler'lara inject et (media + sensors)
         .with_state(app_state)
-        // Sensör endpoint'leri (ayrı state ile)
-        .route("/api/sensors", get(routes::sensors::list_sensors).post(routes::sensors::add_sensor_data))
-        .with_state(sensor_cache)
         // CORS layer'ı ekle
         .layer(cors);
 
